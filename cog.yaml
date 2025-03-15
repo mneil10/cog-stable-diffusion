@@ -2,13 +2,34 @@ build:
   gpu: true
   cuda: "11.8"
   python_version: "3.11.1"
+  system_packages:
+    - "git"
+    - "wget"
   python_packages:
-    - "diffusers==0.11.1"
-    - "torch==1.13.0"
+    - "accelerate==1.5.1"
+    - "diffusers==0.32.2"
+    - "torch==2.6.0+cu118"
+    - "torchvision==0.21.0"
+    - "torchaudio==2.6.0+cu118"
+    - "transformers==4.49.0"
+    - "safetensors==0.5.3"
+    - "huggingface-hub==0.29.3"
+    - "pillow==11.1.0"
+    - "numpy==2.2.3"
+    - "requests==2.32.3"
     - "ftfy==6.1.1"
     - "scipy==1.9.3"
-    - "transformers==4.25.1"
-    - "accelerate==0.15.0"
-    - "huggingface-hub==0.13.2"
+    - "tqdm==4.67.1"
+    - "tokenizers==0.21.1"
+    - "PyYAML==6.0.2"
+    - "filelock==3.17.0"
+    - "packaging==24.2"
+    - "regex==2024.11.6"
+    - "typing_extensions==4.12.2"
 
 predict: "predict.py:Predictor"
+
+# Configuration for model weights
+weights:
+  - path: "model.safetensors"
+    dest: "/tmp/model.safetensors"

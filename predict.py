@@ -1,7 +1,10 @@
 import os
+import requests
 from typing import List
 
+
 import torch
+print(torch.__version__)
 from cog import BasePredictor, Input, Path
 from diffusers import (
     StableDiffusionPipeline,
@@ -16,11 +19,20 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
 
-# MODEL_ID refers to a diffusers-compatible model on HuggingFace
-# e.g. prompthero/openjourney-v2, wavymulder/Analog-Diffusion, etc
-MODEL_ID = "stabilityai/stable-diffusion-2-1"
-MODEL_CACHE = "diffusers-cache"
+# Model configuration
+S3_URL = "https://my-models-bucket12.s3.eu-west-2.amazonaws.com/model.safetensors?response-content-disposition=inline&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEMD%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCWV1LXdlc3QtMiJHMEUCIQDJhZs1mwQGwUpTX7gEAQ4JSuREZDT4%2FDdjLVMLVum2LQIgXG56B2FGiwNI5reVb%2Bh%2FwI2XfpKCJQMB%2BCCdf1P1UDgqxwMIGRAAGgw0MjI3MTg5MzMwNzQiDNGWehYwnsgHKrycZyqkAwBNwuEEuKZk61VdR7jYPin5qkKlaixhdqtZrbppqR0tKm7rXJI9abS5um5a%2FN4R0luo7L9dDXKqugOM2geeyKVTeFiOz%2BZzsQcOd6tg7HJU93FtbK%2BY43FRllMMavWNWhBRZeiz%2FfejPKdu%2F82hpNAIJVEtMzsYMTZ0jClNVvVVxVOcTUlJkjOfgZaz3n7lDf%2BFLaNLW9ZnA82kNEW3kD7AiHAx55AM3ub2u0as6v%2FVUa2wkOZmjnPtCwWyM7iskqgH1SF0Oi%2BLX6aKsNdzgAXjcO12vD1LHF7Qm4fKHKnhVIkcDELvy0L%2FjNBd2fqf5q1FfteWg4Eik6Gy49I6rg%2FC4OAq3C%2Fm9kcqBQQybHmHwM4w8HfLgXrdNVDU%2Brl%2BfTrLpemvhj%2FLLxMF3NWOSSS800%2Fg5TuGbySWKiSDSUbPTKFO1trHtXdNqgCmtUlowkaLzjifT1QJ4xcNcNY%2BKCP3r8gYdCP%2B1sPimKI6ijBRgWgRL8rK2onLUGG1z4bhqml3XmYORI22oB4L%2BxgUxuq2DZeD12gUSIcf1VaaC06uIzgQDTDUxta%2BBjrkAl3l2PoOMKJCeJtjPkP8pC8acL%2B5DYYjgK5oszhFO40nrgs83xPf2n4uB6j9NDLT7%2BZIwbfeTMCsmW%2BxVJIeanWBQhmhTRm%2FCj8MRSDRD%2BsbasQ4kAu%2Bz%2FketRt0I8Yrevhy%2Fgzyp8ZBuB3mE93DbREfzWSXcl%2BU26zqIUnIbc%2FzDFIzrjJ%2F8H6M5JOE%2BE6kBATNA2Lf8Xb%2Bfiq9p5q6RTpmQO%2FrdtOygFJ%2FI%2BY9z0JnmIq5%2FEMc2mg9Nq3KeKlQmSFXTTHHRy1yTo%2FG2%2B%2FtGvI85z6AOFo2G4ydx%2F43yFDn5ohgShtdDYZ55VJO0qs%2FiIHn%2Fk5dmFPN9FQsYLY8tWRR15k4Nb21IhKFJTjsQT%2FKKsI4gjo1CgsPimoKYCHbjkCx5KAvfvYXBpzzhdGhDHn36qYVvTLSOkyLWbTF95WD3yMlfTuhx3ZzFUfN8TwB6Ly6HsD9OvsiUxFfqZ68aCiCZRhW&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIAWE3ADBBJJSNGJPCM%2F20250315%2Feu-west-2%2Fs3%2Faws4_request&X-Amz-Date=20250315T155752Z&X-Amz-Expires=10800&X-Amz-SignedHeaders=host&X-Amz-Signature=115324c90ba261c1d682c9fe97c0e7265fdd2452befaa76d58be10b1bff741c8"
+LOCAL_PATH = "/tmp/model.safetensors"
 SAFETY_MODEL_ID = "CompVis/stable-diffusion-safety-checker"
+MODEL_CACHE = "diffusers-cache"
+
+def download_model():
+    if not os.path.exists(LOCAL_PATH):
+        print("Downloading model from S3...")
+        response = requests.get(S3_URL, stream=True)
+        with open(LOCAL_PATH, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+    return LOCAL_PATH
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -31,11 +43,14 @@ class Predictor(BasePredictor):
             cache_dir=MODEL_CACHE,
             local_files_only=True,
         )
+        
+        # Load custom model from S3
+        model_path = download_model()
         self.pipe = StableDiffusionPipeline.from_pretrained(
-            MODEL_ID,
+            model_path,
             safety_checker=safety_checker,
-            cache_dir=MODEL_CACHE,
-            local_files_only=True,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
         ).to("cuda")
 
     @torch.inference_mode()
